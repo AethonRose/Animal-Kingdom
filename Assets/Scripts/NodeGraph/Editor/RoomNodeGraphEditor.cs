@@ -8,6 +8,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 {
     GUIStyle roomNodeStyle; //Style info for GUI Elements
     static RoomNodeGraphSO currentRoomNodeGraph; //currentRoomNodeGraph reference
+    RoomNodeSO currentRoomNode = null;
     RoomNodeTypeListSO roomNodeTypeList; //roomNodeTypeList reference
 
     //roomNodeStyle Values
@@ -18,14 +19,14 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     //MenuItem - Make new line in Window tab in unity, set the name of new window option & set path of MenuItem
     [MenuItem("Room Node Graph Editor", menuItem = "Window/Dungeon Editor/ Room Node Graph Editor")]
-    //OpenWindow - Called on MenuItem
+    //OpenWindow - Called on MenuItem - Opens window of class RoomNodeGraphEditor
     static void OpenWindow() //MenuItem requires static
     {
         //Starts window of type RoomNodeGraphEditor & set window title
         GetWindow<RoomNodeGraphEditor>("Room Node Graph Editor");
     }
 
-    //Called when object is loaded
+    //OnEnable - Called when object is loaded - Sets roomNodeStyle and loads roomNodeTypes
     void OnEnable()
     {
         //Set roomNodeStyles
@@ -35,7 +36,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         roomNodeTypeList = GameResources.Instance.roomNodeTypeList;
     }
 
-    //SetRoomNodeStyle - Called in OnEnable
+    //SetRoomNodeStyle - Called in OnEnable - Creates style for roomNode
     void SetRoomNodeStyle()
     {
         //Set roomNodeStyle background, textColor, padding & border
@@ -48,7 +49,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     //OnOpenAsset - called when double clicking an asset in the Project Browser
     [OnOpenAsset(0)] // Number basically same a z-order, 1 will call after 0 and so on
-    //OnDoubleClickAsset - Called on OnOpenAsset
+    //OnDoubleClickAsset - Called on OnOpenAsset - Open roomNodeGraph window that is double clicked
     public static bool OnDoubleClickAsset(int instanceID, int line)
     {
         //Set roomNodeGraph to and object of instanceID and save it as the same datatype; RoomNodeGraphSO
@@ -82,14 +83,48 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         }
     }
 
-    //ProcessEvents - Called in OnGUI
+    //ProcessEvents - Called in OnGUI - Processes any Input related Events
     void ProcessEvents(Event currentEvent)
     {
-        //Process Events on RoomNodeGraph
-        ProcessRoomNodeGraphEvents(currentEvent);
+
+        //Execute if currentRoomNode == null || isn't being dragged
+        if (currentRoomNode == null || currentRoomNode.isLeftClickDragging == false)
+        {
+            //Set currentRoomNode to one being Moused Over, return null if no Node
+            currentRoomNode = IsMouseOverRoomNode(currentEvent);
+        }
+
+        //Only Execute if currentRoomNode == null, Stop Execute when roomNode is being hovered
+        if (currentRoomNode == null)
+        {
+            //Process Events on RoomNodeGraph
+            ProcessRoomNodeGraphEvents(currentEvent);
+        }
+        //Only Executes when currentRoomNode != null or when a roomNode is being moused over
+        else
+        {
+            //Process currentRoomNode Events
+            currentRoomNode.ProcessEvents(currentEvent);
+        }
+        
     }
 
-    //ProcessRoomNodeGraphEvents - Called in ProcessEvents
+    //IsMouseOverRoomNode - Called in ProcessEvents - Returns roomNode that Mouse is Over
+    private RoomNodeSO IsMouseOverRoomNode(Event currentEvent)
+    {
+        //Loop through the currentRoomNodeGraph roomNodeList
+        for (int i = currentRoomNodeGraph.roomNodeList.Count - 1; i >= 0; i--)
+        {
+            //Get roomNode in roomNodeList and if its rect Contains currentEvent.mousePosition then return that roomNode 
+            if (currentRoomNodeGraph.roomNodeList[i].rect.Contains(currentEvent.mousePosition))
+            {
+                return currentRoomNodeGraph.roomNodeList[i];
+            }
+        }
+        return null;
+    }
+
+    //ProcessRoomNodeGraphEvents - Called in ProcessEvents - Procceses currentEvents related to RoomNodeGraph
     void ProcessRoomNodeGraphEvents(Event currentEvent)
     {
         //Switchs on currentEvent type (KeyUp/Down, MouseUp/Down, etc.)
@@ -105,7 +140,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         }
     }
 
-    //ProcessMouseDownEvent - Called in ProcessRoomNodeGraphEvents
+    //ProcessMouseDownEvent - Called in ProcessRoomNodeGraphEvents - Processes currentEvents related to MouseDown
     void ProcessMouseDownEvent(Event currentEvent)
     {
         //If right mouse button is pressed Call ShowContextMenu at the currentEvents mousePosition
@@ -116,7 +151,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         }
     }
 
-    //ShowContextMenu - Called in ProcessMouseDownEvent
+    //ShowContextMenu - Called in ProcessMouseDownEvent - Creates menu Items, assigning functions to each item and displaying
     void ShowContextMenu(Vector2 mousePosition)
     {
         //Set menu as datatype GenericMenu 
@@ -127,31 +162,36 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         menu.ShowAsContext();
     }
 
-    //CreateRoomNode - Called in ShowContextMenu > menu.AddItem
+    //CreateRoomNode - Called in ShowContextMenu > menu.AddItem - Creates RoomNodes
     void CreateRoomNode(object mousePositionObject)
     {
-        //Calls overloaded CreateRoomNode Method passing mousePositionObject, and the RoomNodeType of isNone
+        //Calls overloaded CreateRoomNode Method passing mousePositionObject, and the RoomNodeType of isNone for a default state
         CreateRoomNode(mousePositionObject, roomNodeTypeList.list.Find(x => x.isNone)); //predicate
     }
 
-    //CrateRoomNode Overload - Called in CreateRoomNode
+    //CrateRoomNode Overload - Called in CreateRoomNode - Creates RoomNodes
     void CreateRoomNode(object mousePositionObject, RoomNodeTypeSO roomNodeType)
     {
         //Set mousePosition
         Vector2 mousePosition = (Vector2)mousePositionObject;
-        //Set roomNode to a CreatedInstance of a RoomNodeSO
+
+        //Set roomNode = CreateInstance of RoomNode Scriptable Object
         RoomNodeSO roomNode = CreateInstance<RoomNodeSO>();
-        //Add roomNodeSO item to currentRoomNodeGraph's roomNodeList
+
+        //Add roomNode to the currentRoomNodeGraph roomNodeList
         currentRoomNodeGraph.roomNodeList.Add(roomNode);
-        //Initialist roomNode
+
+        //Initialise roomNode
         roomNode.Initialise(new Rect(mousePosition, new Vector2(nodeWidth,nodeHeight)), currentRoomNodeGraph, roomNodeType);
-        //Adds roomNode to the currentRoomNodeGraph Scriptable Object
+        
+        //Add roomNode asset to be childed under currentRoomNodeGraph
         AssetDatabase.AddObjectToAsset(roomNode, currentRoomNodeGraph); //assetdatabase is an interface for accessing and performing operations on assets
+        
         //Writing all unsaved asset changes to disk
         AssetDatabase.SaveAssets();
 
     }
-    //DrawRoomNodes - Called in OnGUI
+    //DrawRoomNodes - Called in OnGUI - Draw all roomNodes in roomNodeList
     void DrawRoomNodes()
     {
         //Loop through each room node in currentRoomNodeGraph.roomNodeList and draw them
@@ -161,16 +201,5 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         }
         //GUI has changed with cause a repaint in OnGUI
         GUI.changed = true;
-    }
-
-    // Creates node on RoomNodeGraphEditor Window
-    void CreateRoomNode(float xNodePosition, float yNodePosition, string nodeLabel)
-    {
-        //BeginArea begins a GUILayout block of GUI controls in a fixed screen area
-        GUILayout.BeginArea(new Rect(new Vector2(xNodePosition,yNodePosition), new Vector2(nodeWidth,nodeHeight)), roomNodeStyle);
-        //Label node
-        EditorGUILayout.LabelField(nodeLabel);
-        //Closes GUILayout block to stop any GUIClip errors
-        GUILayout.EndArea();
     }
 }
