@@ -6,6 +6,7 @@ using System;
 public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with EditorWindow
 {
     GUIStyle roomNodeStyle; //Style info for GUI Elements
+    GUIStyle roomNodeSelectedStyle;
     static RoomNodeGraphSO currentRoomNodeGraph; //currentRoomNodeGraph reference
     RoomNodeSO currentRoomNode = null;
     RoomNodeTypeListSO roomNodeTypeList; //roomNodeTypeList reference
@@ -30,10 +31,12 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     }
 
-
-    //OnEnable - Called when object is loaded - Sets roomNodeStyle and loads roomNodeTypes
+    //OnEnable - Called when object is loaded
     void OnEnable()
     {
+        
+        //Runs InspectorSelectionChanged when current active item has changed, specifying the Inspector
+        Selection.selectionChanged += InspectorSelectionChanged;
 
         //Set roomNodeStyles
         SetRoomNodeStyle();
@@ -43,17 +46,11 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     }
 
-    //SetRoomNodeStyle - Called in OnEnable - Creates style for roomNode
-    void SetRoomNodeStyle()
+    //OnDisabled - Calls when object is unloaded
+    void OnDisable() 
     {
-
-        //Set roomNodeStyle background, textColor, padding & border
-        roomNodeStyle = new GUIStyle();
-        roomNodeStyle.normal.background = EditorGUIUtility.Load("node1") as Texture2D;
-        roomNodeStyle.normal.textColor = Color.white;
-        roomNodeStyle.padding = new RectOffset(nodePadding, nodePadding, nodePadding, nodePadding);
-        roomNodeStyle.border = new RectOffset(nodeBorder, nodeBorder, nodeBorder, nodeBorder);
-
+        //Runs -InspectorSelectionChanged when current active item has changed, to unselect the Disabled Object 
+        Selection.selectionChanged -= InspectorSelectionChanged;
     }
 
     //OnOpenAsset - called when double clicking an asset in the Project Browser
@@ -87,11 +84,9 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
             DrawDraggedLine();
             //Process Mouse & Keyboard events
             ProcessEvents(Event.current);
-            DrawRoomConnections();
+            DrawRoomLines();
             //Process the drawing of  all roomNodes in roomNodeList
             DrawRoomNodes();
-
-            
         }
 
         //Redraw UI if GUI has changed
@@ -102,22 +97,23 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     }
 
-    void DrawDraggedLine()
+    //InspectorSelectionChanged - Called when Unity detects a change in InspectorSelection and in OnEnable & Disable - Changes currentRoomNodeGraph to one Selected in Inspector
+    void InspectorSelectionChanged()
     {
 
-        //Executes if targetNodePosition is != 0
-        if (currentRoomNodeGraph.linePosition != Vector2.zero)
+        //Sets roomNodeGraph to current active Selected Object and saves the activeObject as a RoomNodeGraphSO
+        RoomNodeGraphSO activeRoomNodeGraph = Selection.activeObject as RoomNodeGraphSO;
+
+        //If roomNodeGraph is valid, set currentRoomNodeGraph = activeRoomNodeGraph
+        if (activeRoomNodeGraph != null)
         {
-
-            //Start & End positions of Line
-            Vector2 lineStartPosition = currentRoomNodeGraph.roomNodeToDrawLineFrom.rect.center;
-            Vector2 lineEndPosition = currentRoomNodeGraph.linePosition;
-
-            //Draws line from currentNode to linePosition
-            Handles.DrawBezier(lineStartPosition, lineEndPosition, lineStartPosition, lineEndPosition, Color.white, null, connectingLineWidth);
+            //Set currentRoomNodeGraph to one currently Selected in Inspector
+            currentRoomNodeGraph = activeRoomNodeGraph;
+            GUI.changed = true;
         }
 
     }
+
     //ProcessEvents - Called in OnGUI - Processes any Input related Events
     void ProcessEvents(Event currentEvent)
     {
@@ -142,44 +138,6 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
             currentRoomNode.ProcessEvents(currentEvent);
         }
         
-    }
-    //DrawRoomConnections
-    void DrawRoomConnections()
-    {
-
-        //Loops through each roomNode in currentRoomNodeGraphs roomNodeList
-        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
-        {
-            //If roomNode has any child IDs
-            if (roomNode.childRoomNodeIDList.Count > 0)
-            {
-                //Loops through each childRoomNodeID in roomNode's childRoomNodeIDList
-                foreach (string childRoomNodeID in roomNode.childRoomNodeIDList)
-                {
-                    DrawLineConnection(roomNode, currentRoomNodeGraph.roomNodeDictionary[childRoomNodeID]);
-
-                    GUI.changed = true;
-                }
-            }
-        }
-
-    }
-
-    //IsMouseOverRoomNode - Called in ProcessEvents - Returns roomNode that Mouse is Over
-    private RoomNodeSO IsMouseOverRoomNode(Event currentEvent)
-    {
-
-        //Loop through the currentRoomNodeGraph roomNodeList
-        for (int i = currentRoomNodeGraph.roomNodeList.Count - 1; i >= 0; i--)
-        {
-            //Get roomNode in roomNodeList and if its rect Contains currentEvent.mousePosition then return that roomNode 
-            if (currentRoomNodeGraph.roomNodeList[i].rect.Contains(currentEvent.mousePosition))
-            {
-                return currentRoomNodeGraph.roomNodeList[i];
-            }
-        }
-        return null;
-
     }
 
     //ProcessRoomNodeGraphEvents - Called in ProcessEvents - Procceses currentEvents related to RoomNodeGraph
@@ -218,7 +176,15 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
             ShowContextMenu(currentEvent.mousePosition);
         }
 
+        //If LeftMouseDown ClearDraggedLine & ClearAllSelectedRoomNodes
+        if (currentEvent.button == 0)
+        {
+            ClearDraggedLine();
+            ClearAllSelectedRoomNodes();
+        }
+
     }
+
     //ProcessMouseUpEvent - Calling in ProcessRoomNodeGraphEvents - Processes currentEvents related to MouseUp
     void ProcessMouseUpEvent(Event currentEvent)
     {
@@ -241,7 +207,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
             }
 
             //Clears line on MouseUp
-            ClearLineDrag();
+            ClearDraggedLine();
         }
 
     }
@@ -257,6 +223,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         }
 
     }
+
     //ProcessRightMouseDragEvent - Called in ProcessMouseDragEvent - Processes curentEvents related to RightMouseDragging
     void ProcessRightMouseDragEvent(Event currentEvent)
     {
@@ -264,28 +231,47 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         //Execute If the roomNodeToDrawLineFrom isn't null while rightclicking
         if (currentRoomNodeGraph.roomNodeToDrawLineFrom != null)
         {
-            SetConnectingLinePosition(currentEvent.delta);
+            SetCurrentLinePosition(currentEvent.delta);
             //set a gui change
             GUI.changed = true;
         }
 
     }
-    //ClearLineDrag - Called in ProcessMouseUpEvent - Resets Line Drag setting roomNodeToDrawLineFrom & linePosition to null, zero
-    void ClearLineDrag()
+
+    //IsMouseOverRoomNode - Called in ProcessEvents - Returns roomNode that Mouse is Over
+    private RoomNodeSO IsMouseOverRoomNode(Event currentEvent)
     {
 
-        currentRoomNodeGraph.roomNodeToDrawLineFrom = null;
-        currentRoomNodeGraph.linePosition = Vector2.zero;
-        GUI.changed = true;
+        //Loop through the currentRoomNodeGraph roomNodeList
+        for (int i = currentRoomNodeGraph.roomNodeList.Count - 1; i >= 0; i--)
+        {
+            //Get roomNode in roomNodeList and if its rect Contains currentEvent.mousePosition then return that roomNode 
+            if (currentRoomNodeGraph.roomNodeList[i].rect.Contains(currentEvent.mousePosition))
+            {
+                return currentRoomNodeGraph.roomNodeList[i];
+            }
+        }
+        return null;
 
     }
-
-    //SetConnectingLinePosition - Called in ProcessRightMouseDragEvent -  Sets linePosition to mouse location
-    void SetConnectingLinePosition(Vector2 delta)
+    
+    //SetRoomNodeStyle - Called in OnEnable - Creates style for roomNode
+    void SetRoomNodeStyle()
     {
 
-        //Set linePosition to where the mouse was moved last
-        currentRoomNodeGraph.linePosition += delta;
+        //Set Default roomNodeStyle background, textColor, padding & border
+        roomNodeStyle = new GUIStyle();
+        roomNodeStyle.normal.background = EditorGUIUtility.Load("node1") as Texture2D;
+        roomNodeStyle.normal.textColor = Color.white;
+        roomNodeStyle.padding = new RectOffset(nodePadding, nodePadding, nodePadding, nodePadding);
+        roomNodeStyle.border = new RectOffset(nodeBorder, nodeBorder, nodeBorder, nodeBorder);
+
+        //Set Selected Node Style
+        roomNodeSelectedStyle = new GUIStyle();
+        roomNodeSelectedStyle.normal.background = EditorGUIUtility.Load("node1 on") as Texture2D;
+        roomNodeSelectedStyle.normal.textColor = Color.white;
+        roomNodeSelectedStyle.padding = new RectOffset(nodePadding, nodePadding, nodePadding, nodePadding);
+        roomNodeSelectedStyle.border = new RectOffset(nodeBorder, nodeBorder, nodeBorder, nodeBorder);
 
     }
 
@@ -305,6 +291,13 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
     //CreateRoomNode - Called in ShowContextMenu > menu.AddItem - Creates RoomNodes
     void CreateRoomNode(object mousePositionObject)
     {
+        
+        //If no other roomNodes have been created create an Entrance Node
+        if (currentRoomNodeGraph.roomNodeList.Count == 0)
+        {
+            //Creates Entrance
+            CreateRoomNode(new Vector2(200f, 200f), roomNodeTypeList.list.Find(x => x.isEntrance));
+        }
 
         //Calls overloaded CreateRoomNode Method passing mousePositionObject, and the RoomNodeType of isNone for a default state
         CreateRoomNode(mousePositionObject, roomNodeTypeList.list.Find(x => x.isNone)); //predicate
@@ -337,6 +330,43 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         currentRoomNodeGraph.OnValidate();
 
     }
+
+    //SetConnectingLinePosition - Called in ProcessRightMouseDragEvent -  Sets linePosition to mouse location
+    void SetCurrentLinePosition(Vector2 delta)
+    {
+
+        //Set linePosition to where the mouse was moved last
+        currentRoomNodeGraph.linePosition += delta;
+
+    }
+
+    void DrawDraggedLine()
+    {
+
+        //Executes if targetNodePosition is != 0
+        if (currentRoomNodeGraph.linePosition != Vector2.zero)
+        {
+
+            //Start & End positions of Line
+            Vector2 lineStartPosition = currentRoomNodeGraph.roomNodeToDrawLineFrom.rect.center;
+            Vector2 lineEndPosition = currentRoomNodeGraph.linePosition;
+
+            //Draws line from currentNode to linePosition
+            Handles.DrawBezier(lineStartPosition, lineEndPosition, lineStartPosition, lineEndPosition, Color.white, null, connectingLineWidth);
+        }
+
+    }
+
+    //ClearLineDrag - Called in ProcessMouseUpEvent - Resets Line Drag setting roomNodeToDrawLineFrom & linePosition to null, zero
+    void ClearDraggedLine()
+    {
+
+        currentRoomNodeGraph.roomNodeToDrawLineFrom = null;
+        currentRoomNodeGraph.linePosition = Vector2.zero;
+        GUI.changed = true;
+
+    }
+    
     //DrawRoomNodes - Called in OnGUI - Draw all roomNodes in roomNodeList
     void DrawRoomNodes()
     {
@@ -344,12 +374,45 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         //Loop through each room node in currentRoomNodeGraph.roomNodeList and draw them
         foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
         {
-            roomNode.Draw(roomNodeStyle);
+            //If roomNode isSelected Draw roomNodeSelectedStyle, else Draw default roomNodeStyle
+            if (roomNode.isSelected)
+            {
+                roomNode.Draw(roomNodeSelectedStyle);
+            }
+            else
+            {
+                roomNode.Draw(roomNodeStyle);
+            }
         }
 
         //GUI has changed with cause a repaint in OnGUI
         GUI.changed = true;
+
     }
+
+    //DrawRoomLines - Called in OnGUI - Draw's lines from parentRoomNode to each childRoomNode, if roomNode contains any children
+    void DrawRoomLines()
+    {
+
+        //Loops through each roomNode in currentRoomNodeGraphs roomNodeList, Drawing lines from parentRoomNode to each childRoomNode
+        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+        {
+            //If roomNode has any child IDs
+            if (roomNode.childRoomNodeIDList.Count > 0)
+            {
+                //Loops through each childRoomNodeID in roomNode's childRoomNodeIDList
+                foreach (string childRoomNodeID in roomNode.childRoomNodeIDList)
+                {
+                    //Draw lines from parentRoomNode to all childRoomNodeID's
+                    DrawLineConnection(roomNode, currentRoomNodeGraph.roomNodeDictionary[childRoomNodeID]);
+
+                    GUI.changed = true;
+                }
+            }
+        }
+
+    }
+
     //DrawLineConnection - Called in DrawRoomConnections - Draws Bezier Line from parentNode to childNode
     void DrawLineConnection(RoomNodeSO parentRoomNode, RoomNodeSO childRoomNode)
     {
@@ -381,4 +444,24 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         GUI.changed = true;
 
     }
+
+    //ClearAllSelectedRoomNodes - Called in ProcessMouseDownEvent - Clears selected roomNodes to set back to default Style
+    void ClearAllSelectedRoomNodes()
+    {
+
+        //Loops through each roomNode in roomNodeList
+        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+        {
+
+            //If roomNode is selected, Set isSelected to false to clear Selected roomNodes
+            if (roomNode.isSelected)
+            {
+                roomNode.isSelected = false;
+
+                GUI.changed = true;
+            }
+        }
+
+    }
+    
 }

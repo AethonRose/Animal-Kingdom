@@ -48,12 +48,28 @@ public class RoomNodeSO : ScriptableObject
         GUILayout.BeginArea(rect, nodeStyle);
         //Start region to Detect Popup Selection Changes
         EditorGUI.BeginChangeCheck();
-        //Look through RoomNodeTypes, FindIndex == roomNodeType
-        int selected = roomNodeTypeList.list.FindIndex(x => x == roomNodeType);
-        //Display Popup with GetRoomNodeTypesToDisplay and Default Nodes to the selected Type for the Node on next window open
-        int selection = EditorGUILayout.Popup("", selected, GetRoomNodeTypesToDisplay());
-        //Set current roomNodeType to the selection index of roomNodeTypeList
-        roomNodeType = roomNodeTypeList.list[selection];
+
+        //If roomNode has a parentNode or the roomNodeType isEntrance Set label for roomNode
+        if (parentRoomNodeIDList.Count > 0 || roomNodeType.isEntrance)
+        {
+            //Labels roomNode with roomNodeTypeName
+            EditorGUILayout.LabelField(roomNodeType.roomNodeTypeName);
+        }
+        
+        //If roomNode has no Parents or isn't Entrace, Set roomNode to include the RoomNodeType Selection Popup
+        else
+        {
+             //Look through RoomNodeTypes, FindIndex == roomNodeType
+            int selected = roomNodeTypeList.list.FindIndex(x => x == roomNodeType);
+
+            //Display Popup with GetRoomNodeTypesToDisplay and Default Nodes to the selected Type for the Node on next window open
+            int selection = EditorGUILayout.Popup("", selected, GetRoomNodeTypesToDisplay());
+
+            //Set current roomNodeType to the selection index of roomNodeTypeList
+            roomNodeType = roomNodeTypeList.list[selection];
+        }
+       
+        
         //If change is detected between Begin and End ChangeCheck Set this to Dirty
         if (EditorGUI.EndChangeCheck())
         {
