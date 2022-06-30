@@ -7,17 +7,17 @@ public class RoomNodeSO : ScriptableObject
 {
     
     //Room uniquie identifier, GUID
-    [HideInInspector] public string id;
+    public string id;
     //List of parent GUIDS
-    [HideInInspector] public List<string> parentRoomNodeIDList = new List<string>();
+    public List<string> parentRoomNodeIDList = new List<string>();
     //List of child GUIDS
-    [HideInInspector] public List<string> childRoomNodeIDList = new List<string>();
+    public List<string> childRoomNodeIDList = new List<string>();
     //Init roomNodeGraph as type RoomNodeGraphSO
     [HideInInspector] public RoomNodeGraphSO roomNodeGraph;
-    //Init roomNodeType as type RoomNodeTypeSO
-    public RoomNodeTypeSO roomNodeType;
     //Init roomNodetypeList as type RoomNodeTypeListSO
     [HideInInspector] public RoomNodeTypeListSO roomNodeTypeList;
+    //Init roomNodeType as type RoomNodeTypeSO
+    public RoomNodeTypeSO roomNodeType;
 
 //Runs only if in UNITY_EDITOR
 #if UNITY_EDITOR
@@ -43,9 +43,9 @@ public class RoomNodeSO : ScriptableObject
 
     public void Draw(GUIStyle nodeStyle)
     {
+
         //BeginArea - Draw Node Box
         GUILayout.BeginArea(rect, nodeStyle);
-
         //Start region to Detect Popup Selection Changes
         EditorGUI.BeginChangeCheck();
         //Look through RoomNodeTypes, FindIndex == roomNodeType
@@ -119,6 +119,11 @@ public class RoomNodeSO : ScriptableObject
         {
             ProcessLeftClickDownEvent();
         }
+        //If Right Mouse Button Down
+        if (currentEvent.button == 1)
+        {
+            ProcessRightClickDownEvent(currentEvent);
+        }
     }
 
     //ProcessMouseUpEvent - Called in ProcessEvents - Processes Events related to MouseUp
@@ -129,7 +134,9 @@ public class RoomNodeSO : ScriptableObject
         {
             ProcessLeftClickUpEvent();
         }
+
     }
+
 
     //ProcessMouseDragEvent - Called in ProcessEvents - Processes Events related to MouseDrag
     void ProcessMouseDragEvent(Event currentEvent)
@@ -151,6 +158,13 @@ public class RoomNodeSO : ScriptableObject
         isSelected = !isSelected;
     }
 
+    //ProcessRightClickDownEvent - Called in ProcessMouseDownEvent - Processes Events related to RightClickDown
+    void ProcessRightClickDownEvent(Event currentEvent)
+    {
+        //Set a Room Node to draw a line from on RightClick Event, passing in this roomNode and mousePosiiton
+        roomNodeGraph.SetRoomNodeToDrawLineFrom(this, currentEvent.mousePosition);
+    }
+
     //ProcessLeftClickUpEvent - Called in ProcessMouseUpEvent - Processes Events related to LeftClickUp
     void ProcessLeftClickUpEvent()
     {
@@ -160,6 +174,7 @@ public class RoomNodeSO : ScriptableObject
             isLeftClickDragging = false;
         }
     }
+
     //ProcessLeftClickDragEvent - Called in ProcessMouseDragEvent - Processes Events related to LeftClickDragging
     void ProcessLeftClickDragEvent(Event currentEvent)
     {
@@ -178,6 +193,18 @@ public class RoomNodeSO : ScriptableObject
         rect.position += delta;
         //Notifies Unity about an update and saves
         EditorUtility.SetDirty(this);
+    }
+    //AddChildRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets childID and returns true
+    public bool AddChildRoomNodeIDToRoomNode(string childID)
+    {
+        childRoomNodeIDList.Add(childID);
+        return true;
+    }
+    //AddParentRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets parentID and returns true
+    public bool AddParentRoomNodeIDToRoomNode(string parentID)
+    {
+        parentRoomNodeIDList.Add(parentID);
+        return true;
     }
 
 
