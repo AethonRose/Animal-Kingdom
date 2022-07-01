@@ -28,6 +28,18 @@ public class RoomNodeGraphSO : ScriptableObject
         }
     }
 
+    //GetRoomNode - Called in RoomNodeSO > IsChildRoomValid - Returns roomNode based on roomNodeID
+    public RoomNodeSO GetRoomNode(string roomNodeID)
+    {
+
+        if (roomNodeDictionary.TryGetValue(roomNodeID, out RoomNodeSO roomNode))
+        {
+            return roomNode;
+        }
+        return null;
+
+    }
+
 #if UNITY_EDITOR
 
     //Node to draw line from

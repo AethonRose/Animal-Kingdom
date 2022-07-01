@@ -213,14 +213,107 @@ public class RoomNodeSO : ScriptableObject
     //AddChildRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets childID and returns true
     public bool AddChildRoomNodeIDToRoomNode(string childID)
     {
-        childRoomNodeIDList.Add(childID);
-        return true;
+        if (IsChildRoomValid(childID))
+        {
+            childRoomNodeIDList.Add(childID);
+            return true;
+        }
+
+        return false;
+        
     }
     //AddParentRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets parentID and returns true
     public bool AddParentRoomNodeIDToRoomNode(string parentID)
     {
         parentRoomNodeIDList.Add(parentID);
         return true;
+    }
+
+    //IsChildRoomValid - Called in AddChildRoomNodeIDToRoomNode - RoomNode Valid Checks
+    public bool IsChildRoomValid(string childID)
+    {
+
+        bool isBossNodeAlreadyConnected = false;
+
+        //Loop through each roomNode in roomNodeList
+        foreach (RoomNodeSO roomNode in roomNodeGraph.roomNodeList)
+        {
+            //If roomNodeType isBossRoom & parentIDList count > 0 Set BossNodeAlreadyConnected = true
+            if (roomNode.roomNodeType.isBossRoom && roomNode.parentRoomNodeIDList.Count > 0)
+            {
+                isBossNodeAlreadyConnected = true;
+            }
+        }
+
+        //Allows for the creation of only 1 BossRoom if BossNodeAlreadyConnected
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isBossRoom && isBossNodeAlreadyConnected)
+        {
+            return false;
+        }
+
+        //Disallows the connection of isNone roomNodes
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isNone)
+        {
+            return false;
+        }
+
+        //Disallows childing node multiple times to other roomNode If the roomNode already has a child with this childID return false, not valid
+        if (childRoomNodeIDList.Contains(childID))
+        {
+            return false;
+        }
+
+        //Disallows childing of self If this nodeID == childID return false, not valid
+        if (this.id == childID)
+        {
+            return false;
+        }
+
+        //Disallows parenting of self If this parentRoomNodeIDList contains this nodeID return false, not valid
+        if (parentRoomNodeIDList.Contains(this.id))
+        {
+            return false;
+        }
+
+        //Allow only 1 parent/line per roomNode
+        if (roomNodeGraph.GetRoomNode(childID).parentRoomNodeIDList.Count > 0)
+        {
+            return false;
+        }
+
+        //Disallows connections of corridors
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && roomNodeType.isCorridor)
+        {
+            return false;
+        }
+
+        //Disallows rooms being next to eachother w/o a Corrider inbetween If both childID & roomNodeType are not of Type Corrider return false, not valid
+        if (!roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && !roomNodeType.isCorridor)
+        {
+            return false;
+        }
+
+        //If child isCorridor & 3 corridors are already attached, 4 directions (except Entrance[3 directions]), return false not valid
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && childRoomNodeIDList.Count >= Settings.maxChildCorridors)
+        {
+            return false;
+        }
+
+        //Disallows the childing of an Entrance If childID is of Type Entrance, as Entrance should be top/root parent
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isEntrance)
+        {
+            return false;
+        }
+
+        //Disallows the chliding of more than 1 room If childRoomID isRoom and childList > 0
+        if (!roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && childRoomNodeIDList.Count > 0)
+        {
+            return false;
+        }
+
+        //Return Valid/True on successful journey through checks
+        return true;
+  
     }
 
 
