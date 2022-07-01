@@ -9,9 +9,9 @@ public class RoomNodeSO : ScriptableObject
     //Room uniquie identifier, GUID
     public string id;
     //List of parent GUIDS
-    public List<string> parentRoomNodeIDList = new List<string>();
+    public List<string> roomNodeParentIDList = new List<string>();
     //List of child GUIDS
-    public List<string> childRoomNodeIDList = new List<string>();
+    public List<string> roomNodeChildIDList = new List<string>();
     //Init roomNodeGraph as type RoomNodeGraphSO
     [HideInInspector] public RoomNodeGraphSO roomNodeGraph;
     //Init roomNodetypeList as type RoomNodeTypeListSO
@@ -50,16 +50,16 @@ public class RoomNodeSO : ScriptableObject
         EditorGUI.BeginChangeCheck();
 
         //If roomNode has a parentNode or the roomNodeType isEntrance Set label for roomNode
-        if (parentRoomNodeIDList.Count > 0 || roomNodeType.isEntrance)
+        if (roomNodeParentIDList.Count > 0 || roomNodeType.isEntrance)
         {
             //Labels roomNode with roomNodeTypeName
             EditorGUILayout.LabelField(roomNodeType.roomNodeTypeName);
         }
         
-        //If roomNode has no Parents or isn't Entrace, Set roomNode to include the RoomNodeType Selection Popup
+        //If roomNode has no Parents or isn't Entrance, Set roomNode to include the RoomNodeType Selection Popup
         else
         {
-             //Look through RoomNodeTypes, FindIndex == roomNodeType
+            //Look through RoomNodeTypes, FindIndex == roomNodeType
             int selected = roomNodeTypeList.list.FindIndex(x => x == roomNodeType);
 
             //Display Popup with GetRoomNodeTypesToDisplay and Default Nodes to the selected Type for the Node on next window open
@@ -67,6 +67,34 @@ public class RoomNodeSO : ScriptableObject
 
             //Set current roomNodeType to the selection index of roomNodeTypeList
             roomNodeType = roomNodeTypeList.list[selection];
+
+            //  [selected] isCorridor > [selection] is !Corridor 
+            //  [selected] is !Corridor > [selection] isCorridor 
+            //  [selected] is !BossRoom > [selection] isBossRoom
+            if (roomNodeTypeList.list[selected].isCorridor && !roomNodeTypeList.list[selection].isCorridor || 
+                !roomNodeTypeList.list[selected].isCorridor && roomNodeTypeList.list[selection].isCorridor ||
+                !roomNodeTypeList.list[selected].isBossRoom && roomNodeTypeList.list[selection].isBossRoom)
+            {
+                //If a roomNodeType has changed and has children, delete parentChild Links in order to revalidate
+                if (roomNodeChildIDList.Count > 0)
+                {
+                    //Loop through each roomNodeChild in roomNode
+                    for (int i = roomNodeChildIDList.Count - 1; i >= 0; i--)
+                    {
+                        //Get childRoomNode
+                        RoomNodeSO childRoomNode = roomNodeGraph.GetRoomNode(roomNodeChildIDList[i]);
+
+                        //If childRoomNode isValid
+                        if (childRoomNode != null)
+                        {
+                            //Remove childID from Parent Room Node
+                            RemoveChildRoomNodeIDFromRoomNode(childRoomNode.id);
+                            //Remove parentID from Child Room Node
+                            childRoomNode.RemoveParentRoomNodeIDFromRoomNode(this.id);
+                        }
+                    }
+                }
+            }
         }
        
         
@@ -210,24 +238,6 @@ public class RoomNodeSO : ScriptableObject
         //Notifies Unity about an update and saves
         EditorUtility.SetDirty(this);
     }
-    //AddChildRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets childID and returns true
-    public bool AddChildRoomNodeIDToRoomNode(string childID)
-    {
-        if (IsChildRoomValid(childID))
-        {
-            childRoomNodeIDList.Add(childID);
-            return true;
-        }
-
-        return false;
-        
-    }
-    //AddParentRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets parentID and returns true
-    public bool AddParentRoomNodeIDToRoomNode(string parentID)
-    {
-        parentRoomNodeIDList.Add(parentID);
-        return true;
-    }
 
     //IsChildRoomValid - Called in AddChildRoomNodeIDToRoomNode - RoomNode Valid Checks
     public bool IsChildRoomValid(string childID)
@@ -239,7 +249,7 @@ public class RoomNodeSO : ScriptableObject
         foreach (RoomNodeSO roomNode in roomNodeGraph.roomNodeList)
         {
             //If roomNodeType isBossRoom & parentIDList count > 0 Set BossNodeAlreadyConnected = true
-            if (roomNode.roomNodeType.isBossRoom && roomNode.parentRoomNodeIDList.Count > 0)
+            if (roomNode.roomNodeType.isBossRoom && roomNode.roomNodeParentIDList.Count > 0)
             {
                 isBossNodeAlreadyConnected = true;
             }
@@ -258,7 +268,7 @@ public class RoomNodeSO : ScriptableObject
         }
 
         //Disallows childing node multiple times to other roomNode If the roomNode already has a child with this childID return false, not valid
-        if (childRoomNodeIDList.Contains(childID))
+        if (roomNodeChildIDList.Contains(childID))
         {
             return false;
         }
@@ -270,13 +280,13 @@ public class RoomNodeSO : ScriptableObject
         }
 
         //Disallows parenting of self If this parentRoomNodeIDList contains this nodeID return false, not valid
-        if (parentRoomNodeIDList.Contains(this.id))
+        if (roomNodeParentIDList.Contains(this.id))
         {
             return false;
         }
 
         //Allow only 1 parent/line per roomNode
-        if (roomNodeGraph.GetRoomNode(childID).parentRoomNodeIDList.Count > 0)
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeParentIDList.Count > 0)
         {
             return false;
         }
@@ -294,7 +304,7 @@ public class RoomNodeSO : ScriptableObject
         }
 
         //If child isCorridor & 3 corridors are already attached, 4 directions (except Entrance[3 directions]), return false not valid
-        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && childRoomNodeIDList.Count >= Settings.maxChildCorridors)
+        if (roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && roomNodeChildIDList.Count >= Settings.maxChildCorridors)
         {
             return false;
         }
@@ -306,7 +316,7 @@ public class RoomNodeSO : ScriptableObject
         }
 
         //Disallows the chliding of more than 1 room If childRoomID isRoom and childList > 0
-        if (!roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && childRoomNodeIDList.Count > 0)
+        if (!roomNodeGraph.GetRoomNode(childID).roomNodeType.isCorridor && roomNodeChildIDList.Count > 0)
         {
             return false;
         }
@@ -316,6 +326,58 @@ public class RoomNodeSO : ScriptableObject
   
     }
 
+    //AddChildRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets childID and returns true
+    public bool AddChildRoomNodeIDToRoomNode(string childID)
+    {
+        if (IsChildRoomValid(childID))
+        {
+            roomNodeChildIDList.Add(childID);
+            return true;
+        }
+
+        return false;
+        
+    }
+
+    //AddParentRoomNodeIDToRoomNode - Called in RoomNodeGraphEditor > ProcessMouseUpEvent - Sets parentID and returns true
+    public bool AddParentRoomNodeIDToRoomNode(string parentID)
+    {
+        roomNodeParentIDList.Add(parentID);
+        return true;
+    }
+
+    //RemoveChildRoomNodeIDFromRoomNode - Called in RoomNodeGraphEditor.cs > DeleteSelectedRoomNodeLinks & DeleteSelectedRoomNodes - Remove childID from a roomNode
+    public bool RemoveChildRoomNodeIDFromRoomNode(string childID)
+    {
+
+        //If roomNodes childID list contains childID
+        if (roomNodeChildIDList.Contains(childID))
+        {
+            //Remove childID from roomNodeChildIDList
+            roomNodeChildIDList.Remove(childID);
+            return true;
+        }
+        //Return false if roomNodeChildIDList !Contrain childID
+        return false;
+
+    }
+
+    //RemoveParentRoomNodeIDFromRoomNode - Called in RoomNodeGraphEditor.cs > DeleteSelectedRoomNodeLinks & DeleteSelectedRoomNodes - Remove parentID from a roomNode
+    public bool RemoveParentRoomNodeIDFromRoomNode(string parentID)
+    {
+
+
+        //If roomNodes ParentIDList Contains parentID, remove parentID from ParentIDList
+        if (roomNodeParentIDList.Contains(parentID))
+        {
+            roomNodeParentIDList.Remove(parentID);
+            return true;
+        }
+        //False if roomNodeParentIDList !Contain parentID
+        return false;
+
+    }
 
 #endif
+
 }

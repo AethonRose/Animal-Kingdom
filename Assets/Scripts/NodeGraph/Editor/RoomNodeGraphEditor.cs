@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor; //EditorWindow
 using UnityEditor.Callbacks; //OnOpenAsset
@@ -281,18 +282,53 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
     //ShowContextMenu - Called in ProcessMouseDownEvent - Creates menu Items, assigning functions to each item and displaying
     void ShowContextMenu(Vector2 mousePosition)
     {
-
         //Set menu as datatype GenericMenu 
         GenericMenu menu = new GenericMenu(); //datatype GenericMenu custom context and dropdown windows
 
         //AddItem to rightclick menu, set title, currently active on/off , function to call when item is selected, and current mousePosition
         menu.AddItem(new GUIContent("Create Room Node"), false, CreateRoomNode, mousePosition);
-       
         //Adds Select All RoomNodes button to ContextMenu
-        menu.AddItem(new GUIContent("Select All RoomNodes"), false, SelectAllRoomNodes);
+        menu.AddItem(new GUIContent("Select All Room Nodes"), false, SelectAllRoomNodes);
+        menu.AddSeparator("");
+        menu.AddItem(new GUIContent("Delete Selected Room Node Links"), false, DeleteSelectedRoomNodeLinks);
+        menu.AddItem(new GUIContent("Delete Selected Room Node(s)"), false, DeleteSelectedRoomNodes);
         
         //Shows menu under mouse when right clicked
         menu.ShowAsContext();
+
+    }
+
+    //SelectAllRoomNodes - Called in ShowContextMenu - 
+    void SelectAllRoomNodes()
+    {
+
+        //Loops through each roomNode in Graphs roomNodeList
+        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+        {
+            //Sets each roomNode to isSelected
+            roomNode.isSelected = true;
+        }
+
+        GUI.changed = true;
+
+    }
+    
+    //ClearAllSelectedRoomNodes - Called in ProcessMouseDownEvent - Clears selected roomNodes to set back to default Style
+    void ClearAllSelectedRoomNodes()
+    {
+
+        //Loops through each roomNode in roomNodeList
+        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+        {
+
+            //If roomNode is selected, Set isSelected to false to clear Selected roomNodes
+            if (roomNode.isSelected)
+            {
+                roomNode.isSelected = false;
+
+                GUI.changed = true;
+            }
+        }
 
     }
 
@@ -336,20 +372,101 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     }
 
-    //SelectAllRoomNodes - Called in ShowContextMenu - 
-    void SelectAllRoomNodes()
+    //DeleteSelectedRoomNodeLinks - Called in ShowContextMenu - Remove Selected Links by deleting child-parent relationships
+    void DeleteSelectedRoomNodeLinks()
     {
 
-        //Loops through each roomNode in Graphs roomNodeList
+        //Loop through each roomNode in roomNodeList
         foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
         {
-            //Sets each roomNode to isSelected
-            roomNode.isSelected = true;
-        }
 
-        GUI.changed = true;
+            //If roomNode isSelected & roomNodeCHildIDList Count is > 0
+            if (roomNode.isSelected && roomNode.roomNodeChildIDList.Count > 0)
+            {
+                //Loop through each roomNodeChild in roomNode
+                for (int i = roomNode.roomNodeChildIDList.Count - 1; i >= 0; i--)
+                {
+                    //Get childRoomNode
+                    RoomNodeSO childRoomNode = currentRoomNodeGraph.GetRoomNode(roomNode.roomNodeChildIDList[i]);
+
+                    //If childRoomNode isValid & isSelected
+                    if (childRoomNode != null && childRoomNode.isSelected)
+                    {
+                        //Remove childID from Parent Room Node
+                        roomNode.RemoveChildRoomNodeIDFromRoomNode(childRoomNode.id);
+                        //Remove parentID from Child Room Node
+                        childRoomNode.RemoveParentRoomNodeIDFromRoomNode(roomNode.id);
+                    }
+                }
+            }
+        }
+        //ClearAllSelectedRoomNodes after deletion of RoomNodeLinks
+        ClearAllSelectedRoomNodes();
 
     }
+
+    //DeleteSelectedRoomNodes - Called in ShowContextMenu - Delete Selected Nodes
+    void DeleteSelectedRoomNodes()
+    {
+
+        Queue<RoomNodeSO> roomNodeDeletionQueue = new Queue<RoomNodeSO>();
+        
+        //Loop through each roomNode in roomNodeList
+        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+        {
+            //If roomNode isSelected & is !Entrance, Loops through each childRoomNodeID & parentRoomNodeID
+            if (roomNode.isSelected && !roomNode.roomNodeType.isEntrance)
+            {
+                roomNodeDeletionQueue.Enqueue(roomNode);
+
+                //Loop through each childRoomNodeID in roomNodeChildIDList, ifValid Remove childID & parentID
+                foreach (string roomNodeChildID in roomNode.roomNodeChildIDList)
+                {
+                    //Set childRoomNode
+                    RoomNodeSO roomNodeChild = currentRoomNodeGraph.GetRoomNode(roomNodeChildID);
+
+                    //If childRoomNode isValid
+                    if (roomNodeChild != null)
+                    {
+                        //Remove parentID from childRoomNode
+                        roomNodeChild.RemoveParentRoomNodeIDFromRoomNode(roomNode.id);
+                    }
+                }
+
+                //Loop through each parentRoomNodeID in roomNodeParentIDList, ifValid Remove childID & parentID
+                foreach (string roomNodeParentID in roomNode.roomNodeParentIDList)
+                {
+                    //Set Parent Node
+                    RoomNodeSO roomNodeParent = currentRoomNodeGraph.GetRoomNode(roomNodeParentID);
+                    
+                    //If parentRoomNode isValid
+                    if (roomNodeParent != null)
+                    {
+                        //Remove childID from parentRoomNode
+                        roomNodeParent.RemoveChildRoomNodeIDFromRoomNode(roomNode.id);
+                    }
+                }
+            }
+        }
+
+        //while roomNodeDeletionQueue is populated, delete queued roomNodes
+        while (roomNodeDeletionQueue.Count > 0)
+        {
+            //Get roomNodeToDelete from DeletionQueue
+            RoomNodeSO roomNodeToDelete = roomNodeDeletionQueue.Dequeue();
+
+            //Remove roomNodeToDelete from roomNodeDictionary & roomNodeList
+            currentRoomNodeGraph.roomNodeDictionary.Remove(roomNodeToDelete.id);
+            currentRoomNodeGraph.roomNodeList.Remove(roomNodeToDelete);
+
+            //Destroy Immediately (only use on editor code)
+            DestroyImmediate(roomNodeToDelete, true);
+            AssetDatabase.SaveAssets();
+        }
+
+    }
+
+
 
     //SetConnectingLinePosition - Called in ProcessRightMouseDragEvent -  Sets linePosition to mouse location
     void SetCurrentLinePosition(Vector2 delta)
@@ -418,10 +535,10 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
         {
             //If roomNode has any child IDs
-            if (roomNode.childRoomNodeIDList.Count > 0)
+            if (roomNode.roomNodeChildIDList.Count > 0)
             {
                 //Loops through each childRoomNodeID in roomNode's childRoomNodeIDList
-                foreach (string childRoomNodeID in roomNode.childRoomNodeIDList)
+                foreach (string childRoomNodeID in roomNode.roomNodeChildIDList)
                 {
                     //Draw lines from parentRoomNode to all childRoomNodeID's
                     DrawLineConnection(roomNode, currentRoomNodeGraph.roomNodeDictionary[childRoomNodeID]);
@@ -465,23 +582,6 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
     }
 
-    //ClearAllSelectedRoomNodes - Called in ProcessMouseDownEvent - Clears selected roomNodes to set back to default Style
-    void ClearAllSelectedRoomNodes()
-    {
-
-        //Loops through each roomNode in roomNodeList
-        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
-        {
-
-            //If roomNode is selected, Set isSelected to false to clear Selected roomNodes
-            if (roomNode.isSelected)
-            {
-                roomNode.isSelected = false;
-
-                GUI.changed = true;
-            }
-        }
-
-    }
+    
     
 }
