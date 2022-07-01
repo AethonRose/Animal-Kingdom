@@ -7,6 +7,7 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 {
     GUIStyle roomNodeStyle; //Style info for GUI Elements
     GUIStyle roomNodeSelectedStyle;
+    
     static RoomNodeGraphSO currentRoomNodeGraph; //currentRoomNodeGraph reference
     RoomNodeSO currentRoomNode = null;
     RoomNodeTypeListSO roomNodeTypeList; //roomNodeTypeList reference
@@ -14,8 +15,10 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
     //roomNodeStyle Values
     const float nodeWidth = 200f;
     const float nodeHeight = 75f;
+    
     const int nodePadding = 25;
     const int nodeBorder = 12;
+   
     const float connectingLineWidth = 3f;
     const float connectingLineArrowSize = 6f;
 
@@ -281,8 +284,13 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
 
         //Set menu as datatype GenericMenu 
         GenericMenu menu = new GenericMenu(); //datatype GenericMenu custom context and dropdown windows
+
         //AddItem to rightclick menu, set title, currently active on/off , function to call when item is selected, and current mousePosition
         menu.AddItem(new GUIContent("Create Room Node"), false, CreateRoomNode, mousePosition);
+       
+        //Adds Select All RoomNodes button to ContextMenu
+        menu.AddItem(new GUIContent("Select All RoomNodes"), false, SelectAllRoomNodes);
+        
         //Shows menu under mouse when right clicked
         menu.ShowAsContext();
 
@@ -310,24 +318,36 @@ public class RoomNodeGraphEditor : EditorWindow //Replacing MonoBehavior with Ed
         
         //Set mousePosition
         Vector2 mousePosition = (Vector2)mousePositionObject;
-
         //Set roomNode = CreateInstance of RoomNode Scriptable Object
         RoomNodeSO roomNode = CreateInstance<RoomNodeSO>();
 
         //Add roomNode to the currentRoomNodeGraph roomNodeList
         currentRoomNodeGraph.roomNodeList.Add(roomNode);
-
         //Initialise roomNode
         roomNode.Initialise(new Rect(mousePosition, new Vector2(nodeWidth,nodeHeight)), currentRoomNodeGraph, roomNodeType);
         
         //Add roomNode asset to be childed under currentRoomNodeGraph
         AssetDatabase.AddObjectToAsset(roomNode, currentRoomNodeGraph); //assetdatabase is an interface for accessing and performing operations on assets
-        
         //Writing all unsaved asset changes to disk
         AssetDatabase.SaveAssets();
 
         //Update CurrentRoomNodeGraphs RoomNodeDictionary
         currentRoomNodeGraph.OnValidate();
+
+    }
+
+    //SelectAllRoomNodes - Called in ShowContextMenu - 
+    void SelectAllRoomNodes()
+    {
+
+        //Loops through each roomNode in Graphs roomNodeList
+        foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+        {
+            //Sets each roomNode to isSelected
+            roomNode.isSelected = true;
+        }
+
+        GUI.changed = true;
 
     }
 
