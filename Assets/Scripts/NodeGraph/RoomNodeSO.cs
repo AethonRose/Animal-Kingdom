@@ -68,6 +68,8 @@ public class RoomNodeSO : ScriptableObject
             //Set current roomNodeType to the selection index of roomNodeTypeList
             roomNodeType = roomNodeTypeList.list[selection];
 
+            //Check for any changes in NodeTypeSelection in order to break Links when conditions met
+            //
             //  [selected] isCorridor > [selection] is !Corridor 
             //  [selected] is !Corridor > [selection] isCorridor 
             //  [selected] is !BossRoom > [selection] isBossRoom
@@ -231,7 +233,7 @@ public class RoomNodeSO : ScriptableObject
     }
 
     //DragNode - Called in ProcessLeftClickDragEvent - Handles LeftClickDrag Movement of roomNodes
-    void DragNode(Vector2 delta)
+    public void DragNode(Vector2 delta)
     {
         //Move currentRoomNode position to the added movement since last Event
         rect.position += delta;
