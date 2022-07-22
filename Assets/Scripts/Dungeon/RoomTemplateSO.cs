@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -7,8 +7,6 @@ using UnityEngine;
 public class RoomTemplateSO : ScriptableObject
 {
    [HideInInspector] public string guid;
-
-
 
    #region Header ROOM PREFAB
 
@@ -100,4 +98,6 @@ public class RoomTemplateSO : ScriptableObject
 #endif
 
     #endregion Validation
+
+
 }

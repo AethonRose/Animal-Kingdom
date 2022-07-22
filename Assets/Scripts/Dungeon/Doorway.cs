@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 [System.Serializable]
 
 public class Doorway
@@ -13,19 +13,24 @@ public class Doorway
     public GameObject doorPrefab;
 
     #region Header
+
     [Header("Upper Left Position to Start Copying From")]
+
     #endregion
     public Vector2Int doorwayStartCopyPosition;
 
     #region Header
+
     [Header("Width of the tiles in the doorway to copy over")]
+
     #endregion
     public int doorwayCopyTileWidth;
 
     #region Header
+
     [Header("Height of the tiles in the doorway to copy over")]
+    
     #endregion
     public int doorwayCopyTileHeight;
-
 
 }
